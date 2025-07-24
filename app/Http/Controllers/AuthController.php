@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RegisterStoreRequest;
 use App\Http\Resources\UserResource;
+use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -70,6 +74,42 @@ class AuthController extends Controller
                 'message' => 'Logout Berhasil',
                 'data' => null
             ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Terjadi kesalahan',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function register(RegisterStoreRequest $request)
+    {
+        $data = $request->validated(); // untuk validasi
+
+        // kemudian setelah tervalidasi, kita tambahkan
+        DB::beginTransaction(); // agar saat terjadi kesalahan ga langsung ke input ke db
+
+        try {
+            $user = new User;
+            // kemudian kita simpan name, email, password
+            $user->name = $data['name'];
+            $user->email = $data['email'];
+            $user->password = Hash::make($data['password']);
+            $user->save();
+
+            // setelah berhasil regist maka kita berikan tokennya
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            // ini untuk kita masukkan ke db
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Registrasi Berhasil',
+                'data' => [
+                    'token' => $token,
+                    'user' => new UserResource($user) // data user kita panggil dari new UserResource($user)
+                ]
+            ], 201);
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Terjadi kesalahan',
